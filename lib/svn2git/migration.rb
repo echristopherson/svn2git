@@ -54,6 +54,7 @@ module Svn2Git
       options[:username] = nil
       options[:password] = nil
       options[:rebasebranch] = false
+      options[:resume_existing] = false
 
       if File.exists?(File.expand_path(DEFAULT_AUTHORS_FILE))
         options[:authors] = DEFAULT_AUTHORS_FILE
@@ -138,6 +139,10 @@ module Svn2Git
           options[:rebasebranch] = rebasebranch
         end
 
+        opts.on('--resume-existing', 'Resume cloning existing repo (TODO: only the initial fetch process can be resumed, currently).') do
+          options[:resume_existing] = resume_existing
+        end
+
         opts.separator ""
 
         # No argument, shows at tail.  This will print an options summary.
@@ -178,39 +183,43 @@ module Svn2Git
       revision = @options[:revision]
       username = @options[:username]
       password = @options[:password]
+      resume_existing = @options[:resume_existing]
+      packed_git_limit = @options[:packed_git_limit]
 
-      if rootistrunk
-        # Non-standard repository layout.  The repository root is effectively 'trunk.'
-        cmd = "git svn init --prefix=svn/ "
-        cmd += "--username=#{username} " unless username.nil?
-        cmd += "--password=#{password} " unless password.nil?
-        cmd += "--no-metadata " unless metadata
-        if nominimizeurl
-          cmd += "--no-minimize-url "
+      unless resume_existing
+        if rootistrunk
+          # Non-standard repository layout.  The repository root is effectively 'trunk.'
+          cmd = "git svn init --prefix=svn/ "
+          cmd += "--username=#{username} " unless username.nil?
+          cmd += "--password=#{password} " unless password.nil?
+          cmd += "--no-metadata " unless metadata
+          if nominimizeurl
+            cmd += "--no-minimize-url "
+          end
+          cmd += "--trunk=#{@url}"
+          run_command(cmd, true, true)
+
+        else
+          cmd = "git svn init --prefix=svn/ "
+
+          # Add each component to the command that was passed as an argument.
+          cmd += "--username=#{username} " unless username.nil?
+          cmd += "--password=#{password} " unless password.nil?
+          cmd += "--no-metadata " unless metadata
+          if nominimizeurl
+            cmd += "--no-minimize-url "
+          end
+          cmd += "--trunk=#{trunk} " unless trunk.nil?
+          cmd += "--tags=#{tags} " unless tags.nil?
+          cmd += "--branches=#{branches} " unless branches.nil?
+
+          cmd += @url
+
+          run_command(cmd, true, true)
         end
-        cmd += "--trunk=#{@url}"
-        run_command(cmd, true, true)
 
-      else
-        cmd = "git svn init --prefix=svn/ "
-
-        # Add each component to the command that was passed as an argument.
-        cmd += "--username=#{username} " unless username.nil?
-        cmd += "--password=#{password} " unless password.nil?
-        cmd += "--no-metadata " unless metadata
-        if nominimizeurl
-          cmd += "--no-minimize-url "
-        end
-        cmd += "--trunk=#{trunk} " unless trunk.nil?
-        cmd += "--tags=#{tags} " unless tags.nil?
-        cmd += "--branches=#{branches} " unless branches.nil?
-
-        cmd += @url
-
-        run_command(cmd, true, true)
+        run_command("#{git_config_command} svn.authorsfile #{authors}") unless authors.nil?
       end
-
-      run_command("#{git_config_command} svn.authorsfile #{authors}") unless authors.nil?
 
       cmd = "git svn fetch "
       unless revision.nil?
