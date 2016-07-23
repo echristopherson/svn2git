@@ -55,6 +55,7 @@ module Svn2Git
       options[:password] = nil
       options[:rebasebranch] = false
       options[:resume_existing] = false
+      options[:packed_git_limit] = nil
 
       if File.exists?(File.expand_path(DEFAULT_AUTHORS_FILE))
         options[:authors] = DEFAULT_AUTHORS_FILE
@@ -143,6 +144,10 @@ module Svn2Git
           options[:resume_existing] = resume_existing
         end
 
+        opts.on('--packed-git-limit PACKED-GIT-LIMIT', "Set git's maximum number of bytes to map simultaneously into memory from pack files (core.packedGitLimit).") do |packed_git_limit|
+          options[:packed_git_limit] = packed_git_limit
+        end
+
         opts.separator ""
 
         # No argument, shows at tail.  This will print an options summary.
@@ -219,6 +224,7 @@ module Svn2Git
         end
 
         run_command("#{git_config_command} svn.authorsfile #{authors}") unless authors.nil?
+        run_command("#{git_config_command} core.packedGitLimit #{packed_git_limit}") unless packed_git_limit.nil?
       end
 
       cmd = "git svn fetch "
